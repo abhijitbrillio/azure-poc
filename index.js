@@ -1,12 +1,41 @@
-const { DefaultAzureCredential } = require("@azure/identity")
+const { ResourceManagementClient } = require("@azure/arm-resources");
+const { SubscriptionClient } = require("@azure/arm-resources-subscriptions");
+const { DefaultAzureCredential } = require("@azure/identity");
 const {
-    ResourceManagementClient
-} = require("@azure/arm-resources")
-require('dotenv').config()
+    AuthorizationManagementClient,
+    RoleAssignmentCreateParameters,
+} = require("@azure/arm-authorization")
+require("dotenv").config();
 
-const resourceGroupName = "test-group";
-const subscriptionId = "05205141-e127-4449-be58-8f276e1df559";
-const resourceClient = new ResourceManagementClient(new DefaultAzureCredential(), subscriptionId);
+
+const credential = new DefaultAzureCredential();
+const subscriptionId = "";
+const resourceClient = new ResourceManagementClient(credential, subscriptionId);
+const subscriptionClient = new SubscriptionClient(credential);
+const authClient = new AuthorizationManagementClient(credential, subscriptionId);
+
+const resourceGroupName = "";
+
+
+//resourceGroups.list
+async function subscriptions_list() {
+    const result_list = [];
+    for await (const item of subscriptionClient.subscriptions.list()) {
+        result_list.push(item);
+    }
+    console.log(result_list);
+}
+
+
+//resourceGroups.list
+async function resourceGroups_list() {
+    const result_list = [];
+    for await (const item of resourceClient.resourceGroups.list()) {
+        result_list.push(item);
+    }
+    console.log(result_list);
+}
+
 
 //resourceGroups.get
 async function resourceGroups_get() {
@@ -14,31 +43,57 @@ async function resourceGroups_get() {
     console.log(result_get);
 }
 
-//resourceGroups.checkExistence
-async function resourceGroups_checkExistence() {
-    const result_check = await resourceClient.resourceGroups.checkExistence(
-        resourceGroupName
-    );
-    console.log(result_check);
-
-    const unknowGroup = "unknowGroup";
-    const result_check_unknowGroup = await resourceClient.resourceGroups.checkExistence(
-        unknowGroup
-    );
-    console.log(result_check_unknowGroup);
-}
 
 //resources.listByResourceGroup
 async function resources_listByResourceGroup() {
     const resultArray = [];
     for await (const item of resourceClient.resources.listByResourceGroup(
-      resourceGroupName
+        resourceGroupName
     )) {
-      resultArray.push(item);
+        resultArray.push(item);
     }
     console.log(resultArray);
-  }
-  
+}
 
-// resourceGroups_checkExistence();
-resources_listByResourceGroup();
+
+//resources.list
+async function resources_list() {
+    const resultArray = [];
+    for await (const item of resourceClient.resources.list()) {
+        const resource = await resources_getById(item)
+        resultArray.push(resource);
+        console.log(resource)
+    }
+}
+
+
+async function getApiVersion(resourceType) {
+    const providerNamespace = resourceType.split('/')[0]
+    const provider = await resourceClient.providers.get(providerNamespace);
+    return provider.resourceTypes[0].apiVersions[0]
+}
+
+
+//resources.getById
+async function resources_getById(resource) {
+    const apiVersion = await getApiVersion(resource.type)
+    try {
+        const get_result = await resourceClient.resources.getById(
+            resource.id,
+            apiVersion
+        );
+        return get_result;
+    } catch (ex) {
+        return resource;
+    }
+}
+
+async function roleAssignments_list() {
+    const list = await authClient.roleAssignments;
+    console.log(list)
+        // for await (const item of authClient.roleAssignments.list()) {
+        //   console.log(item);
+        // }
+}
+
+resources_list();
